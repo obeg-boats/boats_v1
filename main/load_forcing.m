@@ -46,11 +46,11 @@ if strcmp(boats.param.main.sim_type,'h')
     end
     if ~strcmp(boats.param.main.reg_type,'oa')
         if length(size(Economical.effEtarg)) == 5
-            forcing.effEtarg=Economical.effEtarg(:,:,:,:,ind_ensemble);              % "TRUE" EFFECTIVE EFFORT target for each ensemble, time varying effEtarg [lo, la, group, ens]
+            forcing.effEtarg=Economical.effEtarg(:,:,:,:,ind_ensemble);             
         elseif length(size(Economical.effEtarg)) == 4
-            forcing.effEtarg=Economical.effEtarg(:,:,:,ind_ensemble);              % "TRUE" EFFECTIVE EFFORT target for each ensemble [lo, la, group, ens]
+            forcing.effEtarg=Economical.effEtarg(:,:,:,ind_ensemble);             
         end
-        forcing.societenf=Economical.societenf;                                % Map of level of compliance with effort targets, based on GDP, for just one group
+        forcing.societenf=Economical.societenf;                                
     end
  end
 

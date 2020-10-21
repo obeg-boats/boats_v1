@@ -366,11 +366,11 @@ for indt = 1:ntime
     %              fmass_4d ./ squeeze(dfish + epsln) * part_PP_g;
     % Optimized code by using "bsxfun" instead of repmat
     
-    % NO IRON LIMITATION (ECOL.tro_sca = scalar)
+    % No iron-lim HNLC (ECOL.tro_sca = scalar)
     %   en_input_P = bsxfun(@times,npp./mphyto, ...
     %                (bsxfun(@rdivide,permute(STRU.fmass_2d.^(ECOL.tro_sca-1),[3 4 1 2]),mphyto.^(ECOL.tro_sca-1)) .* ...
     %                STRU.fmass_4d ./ squeeze(dfish + CONV.epsln) * part_PP_g));
-    % IRON LIMITATION (ECOL.tro_sca = map)
+    % With iron-lim HNLC (ECOL.tro_sca = map)
     en_input_P = bsxfun(@times,npp./mphyto, ...
         (bsxfun(@rdivide,permute(repmat(STRU.fmass_2d,[1 1 180 360]),[3 4 1 2]).^ ...
         (repmat(ECOL.tro_sca,[1 1 ECOL.nfish ECOL.nfmass])-1),mphyto.^(ECOL.tro_sca-1)) .* ...
@@ -410,10 +410,10 @@ for indt = 1:ntime
     %---------------------------------------------------------------------------------------
     % Boundary condition based on primary production
     % multiply by boundary condition partition function (part_PP_b)
-    % NO IRON LIMITATION (ECOL.tro_sca = scalar)
+    % No iron-lim HNLC (ECOL.tro_sca = scalar)
     %   flux_in_P = part_PP_b * (repmat(npp./mphyto,[1 1 ECOL.nfish])) .* (STRU.fmass_bc./repmat(mphyto,[1 1 ECOL.nfish])).^ ...
     %               (ECOL.tro_sca-1) * STRU.fmass_bc / STRU.delfm_4d(1,1,1,1);
-    % IRON LIMITATION (ECOL.tro_sca = map)
+    % With iron-lim HNLC (ECOL.tro_sca = map)
     flux_in_P = part_PP_b * (repmat(npp./mphyto,[1 1 ECOL.nfish])) .* (STRU.fmass_bc./repmat(mphyto,[1 1 ECOL.nfish])).^ ...
         (repmat(ECOL.tro_sca,[1 1 ECOL.nfish])-1) * STRU.fmass_bc / STRU.delfm_4d(1,1,1,1);
     
@@ -513,7 +513,7 @@ for indt = 1:ntime
         %      repmat(squeeze(effort+epsln),[1 1 1 nfmass]) .* selectivity_4d .* squeeze(dfish_temp));
         % Optimized code by using "bsxfun" instead of repmat
         dharvest = min(squeeze(dfish_temp)/MAIN.dtts, ...
-            bsxfun(@times,bsxfun(@times,permute(qcatch(:),[2 3 1]),squeeze(effort+CONV.epsln)), ... % effort_month
+            bsxfun(@times,bsxfun(@times,permute(qcatch(:),[2 3 1]),squeeze(effort+CONV.epsln)), ... 
             STRU.selectivity_4d .* squeeze(dfish_temp)));
         
         mask_dharvest_neg = (squeeze(dharvest) < 0);
@@ -566,7 +566,7 @@ for indt = 1:ntime
         % Original code - changed to optimize calculation
         % cost =  permute(repmat(cost_effort(:),[1 nlat nlon]),[2 3 1]) .* squeeze(effort + epsln);
         % Optimized code by using "bsxfun" instead of repmat
-        cost =  bsxfun(@times,permute(cost_effort(:),[2 3 1]),squeeze(effort + CONV.epsln)); % effort_month
+        cost =  bsxfun(@times,permute(cost_effort(:),[2 3 1]),squeeze(effort + CONV.epsln)); 
         
         %-------------------------------------------------------------------------------------
         % cost_memory [nlat,nlon,nfish,12] % SAVES COST FR. LAST 12 MONTHS
@@ -581,11 +581,11 @@ for indt = 1:ntime
             cost_memory(:,:,:,12) = cost;
         end
         
-        if strcmp(MAIN.reg_type,'oa')
+        if strcmp(MAIN.reg_type,'oa') % no regulation
             
             %-------------------------------------------------------------------------------------
-            % effort_change [nlat,nlon,nfish] %% KIM: THIS IS THE ORIGINAL CODE
-            % CALCULATE EFFORT CHANGE IN EACH MONTH
+            % effort_change [nlat,nlon,nfish] 
+            % (monthly)
             %-------------------------------------------------------------------------------------
             effort_change = ECON.k_e * (revenue - cost) ./ (effort + CONV.epsln);
             
@@ -593,11 +593,11 @@ for indt = 1:ntime
             % integrate effort [nlat,nlon,nfish]
             %-------------------------------------------------------------------------------------
             % Monthly integration of effort
-            effort = squeeze(effort) + effort_change * MAIN.dtts; % * MAIN.dtts // * CONV.spery
+            effort = squeeze(effort) + effort_change * MAIN.dtts; 
             mask_effort_neg = (squeeze(effort) < 0);
             effort(mask_effort_neg)  = 0;
             
-        elseif strcmp(MAIN.reg_type,'omnT')
+        elseif strcmp(MAIN.reg_type,'omnT') % regulation
             
             %----------------------------------------------------------------------------------
             % Societal enforcement forcing [nlat,nlon,nfish]
@@ -622,18 +622,14 @@ for indt = 1:ntime
                 effEtarg = squeeze(FORC.effEtarg(:,:,indt/12,:));
             end
             
-            
             %-------------------------------------------------------------------------------------
             % Regulated and unregulated cells [nlat,nlon,nfish]
             %-------------------------------------------------------------------------------------
             % Calculate effort evolution in cells where a regulation target has been
             % estimated because of decreasing catch
-            mask_reg            = find(regulation_onset == 1); % only in cells where regulation has started
-            %         mask_reg     = find((regulation_onset == 1) & (effEtarg * ECON.precaut / catchability_y_avg) < effort ); % only in cells where regulation has started
-            %         mask_reg_old = find(regulation_onset == 1);
-            mask_noreg                  = find(regulation_onset == 0);
-            
-            % only cells where regulation has been triggered AND current nominal effort is higher than target nominal effort!
+            mask_reg            = find(regulation_onset == 1); % cells where regulation has started
+            mask_noreg          = find(regulation_onset == 0);
+            % mask_reg           = find((regulation_onset == 1) & (effEtarg * ECON.precaut / catchability_y_avg) < effort ); % cells where regulation has started AND current nominal effort is higher than target nominal effort
             
             %-------------------------------------------------------------------------------------
             % Calculate effort_change every month
@@ -645,7 +641,7 @@ for indt = 1:ntime
                 %-------------------------------------------------------------------------------------
                 effort_change(mask_reg) = ECON.k_e * (revenue(mask_reg) - cost(mask_reg)) ./ (effort(mask_reg) + CONV.epsln) ...
                     .* (ones(length(mask_reg),1) - societenf(mask_reg)) + ECON.k_s .* societenf(mask_reg) .* (effEtarg(mask_reg) * ECON.precaut ...
-                    / FORC.catchability(indt) - effort(mask_reg)); % assuming all groups have same qcatch
+                    / FORC.catchability(indt) - effort(mask_reg)); 
                 
                 %-------------------------------------------------------------------------------------
                 % Calculate unregulated effort_change [nlat,nlon,nfish]
@@ -699,7 +695,7 @@ for indt = 1:ntime
                 % integrate effort [nlat,nlon,nfish]
                 %-------------------------------------------------------------------------------------
                 % Annual integration of effort
-                effort = squeeze(effort) + effort_change * CONV.spery; % * MAIN.dtts
+                effort = squeeze(effort) + effort_change * CONV.spery; 
                 mask_effort_neg = (squeeze(effort) < 0);
                 effort(mask_effort_neg)  = 0;
             end
@@ -732,7 +728,7 @@ for indt = 1:ntime
         %-------------------------------------------------------------------------------------
         % DETERMINE IF REGULATION SHOULD BEGIN: regulation_onset
         %-------------------------------------------------------------------------------------
-        if ~strcmp(MAIN.reg_type,'oa')                                         % only determine if it's not an OA simulation
+        if ~strcmp(MAIN.reg_type,'oa')                                         % if not an OA simulation
             
             %-------------------------------------------------------------------------------------
             % harvest_sum [nlat,nlon,nfish]
@@ -748,10 +744,9 @@ for indt = 1:ntime
             % save "timeseries" of harvest for determination of regulation onset
             %-------------------------------------------------------------------------------------
             if indt == 1  % set first value of harvest_sum as the first point in time series
-                harvest_times = harvest_sum;     % This command overwrites the preallocated array for harvest_times: harvest_times = harvest_sum;
-                % harvest_times(:,:,:,indt) = harvest_sum;   % Why not use this?
+                harvest_times = harvest_sum;    
             elseif indt <= ECON.times_length % add present harvest_sum value as the following point until reaching desired timeseries lenght (times_length)
-                harvest_times = cat(4, harvest_times, harvest_sum);  % add new point to the 4th dimension (i.e. the time series) in harvest_data
+                harvest_times = cat(4, harvest_times, harvest_sum);  % add new point to 4th dimension (i.e. the time series) in harvest_data
             else        % when timeseries length is times_length, cut off the oldest data point and add present harvest_sum to the end of time serie
                 harvest_times(:,:,:,1:ECON.times_length-1) = harvest_times(:,:,:,2:ECON.times_length);
                 harvest_times(:,:,:,ECON.times_length) = harvest_sum;
@@ -763,11 +758,11 @@ for indt = 1:ntime
             % save the highest recorded annual harvest so far/of all time steps
             %-------------------------------------------------------------------------------------
             if indt == 1
-                annual_harvest_max = harvest_sum; % default initial harvest max is harvest_sum in January (means that it will definitely will be smaller than 2nd years harvest)
+                annual_harvest_max = harvest_sum; % default initial harvest max is harvest_sum in January 
             elseif mod(indt,12) == 1 % each january, sum the 12 previous months in harvest_data to get annual harvest
                 annual_harvest = nansum(harvest_times(:,:,:,end-12:end-1),4); % save harvest from previous 12 months using the last 12 months in harvest_data
                 annual_max_ind = find(annual_harvest > annual_harvest_max); % find all cells where calculated annual_harvest is higher than annual_harvest_max previously calculated
-                annual_harvest_max(annual_max_ind) = annual_harvest(annual_max_ind); % update new highest annual harvest so far!
+                annual_harvest_max(annual_max_ind) = annual_harvest(annual_max_ind); % update new highest annual harvest so far
             end
             
             %-------------------------------------------------------------------------------------
@@ -776,12 +771,12 @@ for indt = 1:ntime
             % save "timeseries" of effort for 'optS' and 'stockT' regulation
             %-------------------------------------------------------------------------------------
             if indt == 1
-                effort_times           = effort; % effort_month
+                effort_times           = effort; 
             elseif indt <= ECON.times_length
-                effort_times           = cat(4, effort_times, effort); % effort_month
+                effort_times           = cat(4, effort_times, effort); 
             else
                 effort_times(:,:,:,1:ECON.times_length-1)  = effort_times(:,:,:,2:ECON.times_length);
-                effort_times(:,:,:,ECON.times_length)      = effort; % effort_month
+                effort_times(:,:,:,ECON.times_length)      = effort; 
             end
             
             %-------------------------------------------------------------------------------------
@@ -945,7 +940,7 @@ end % for indt = 1:ntime
  if MAIN.save_restart==1
    boats.dfish      = dfish;
    if strcmp(MAIN.sim_type,'h')
-     boats.effort   = effort; % OR should it be effort_month?
+     boats.effort   = effort; 
    end
  end
 
@@ -1007,7 +1002,7 @@ end % for indt = 1:ntime
 %-----------------------------------------------------------------------------------------
 % Save regulation stats for each simulation
 %-----------------------------------------------------------------------------------------
-  if ~strcmp(MAIN.reg_type,'oa') && strcmp(MAIN.sim_type,'h')                  % Only if harvest is regulated (not open access)
+  if ~strcmp(MAIN.reg_type,'oa') && strcmp(MAIN.sim_type,'h')                  % Only if harvest is regulated (not 'oa')
     % Regulation stats (output)
     boats.output.stats.regulation_onset        = regulation_onset;
     boats.output.stats.indt_at_reg_onset       = indt_at_reg_onset;
